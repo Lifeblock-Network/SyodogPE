@@ -15,18 +15,26 @@
 
 package dev.waterdog.waterdogpe.network.protocol;
 
+import dev.waterdog.waterdogpe.ProxyServer;
 import dev.waterdog.waterdogpe.network.protocol.updaters.CodecUpdater419;
 import dev.waterdog.waterdogpe.network.protocol.updaters.ProtocolCodecUpdater;
+import dev.waterdog.waterdogpe.utils.WrapperBedrockCodecHelper;
+import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
+import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
+import org.cloudburstmc.protocol.bedrock.codec.v388.BedrockCodecHelper_v388;
+import org.cloudburstmc.protocol.bedrock.data.EncodingSettings;
+import org.cloudburstmc.protocol.bedrock.data.skin.*;
 import org.cloudburstmc.protocol.bedrock.packet.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ProtocolCodecs {
-    
+
     private static final List<Class<? extends BedrockPacket>> HANDLED_PACKETS = new ArrayList<>();
+
     static {
         HANDLED_PACKETS.add(LoginPacket.class);
         HANDLED_PACKETS.add(PlayStatusPacket.class);
@@ -124,6 +132,7 @@ public class ProtocolCodecs {
 
     private static final List<ProtocolCodecUpdater> UPDATERS = new ObjectArrayList<>();
     private static final ProtocolCodecUpdater DEFAULT_UPDATER = (builder, codec) -> builder.retainPackets(HANDLED_PACKETS.toArray(new Class[]{}));
+
     static {
         UPDATERS.add(new CodecUpdater419());
     }
@@ -145,6 +154,91 @@ public class ProtocolCodecs {
                 updater.updateCodec(builder, baseCodec);
             }
         }
+        builder.helper(() -> {
+            BedrockCodecHelper helper = baseCodec.createHelper();
+            EncodingSettings encodingSettings = EncodingSettings.builder()
+                    .maxByteArraySize(ProxyServer.getInstance().getConfiguration().getNetworkSettings().maxByteArraySize())
+                    .maxListSize(ProxyServer.getInstance().getConfiguration().getNetworkSettings().maxListSize())
+                    .maxNetworkNBTSize(ProxyServer.getInstance().getConfiguration().getNetworkSettings().maxNetworkNBTSize())
+                    .maxItemNBTSize(ProxyServer.getInstance().getConfiguration().getNetworkSettings().maxItemNBTSize())
+                    .maxStringLength(ProxyServer.getInstance().getConfiguration().getNetworkSettings().maxStringLength())
+                    .build();
+            helper.setEncodingSettings(encodingSettings);
+            return new WrapperBedrockCodecHelper(helper) {
+                static final int CUSTOM_MODEL_SIZE = ProxyServer.getInstance().getConfiguration().getNetworkSettings().maxSkinLength();
+                static final AnimatedTextureType[] TEXTURE_TYPES = AnimatedTextureType.values();
+                static final AnimationExpressionType[] EXPRESSION_TYPES = AnimationExpressionType.values();
+
+
+                final BedrockCodecHelper_v388 helperV388;
+
+                {
+                    if (!(helper instanceof BedrockCodecHelper_v388 h)) {
+                        throw new IllegalStateException("Expected BedrockCodecHelper_v388, got " + helper.getClass().getName());
+                    }
+                    this.helperV388 = h;
+                }
+
+                public AnimationData readAnimationData(ByteBuf buffer) {
+                    ImageData image = helperV388.readImage(buffer, CUSTOM_MODEL_SIZE);
+                    AnimatedTextureType textureType = TEXTURE_TYPES[buffer.readIntLE()];
+                    float frames = buffer.readFloatLE();
+                    AnimationExpressionType expressionType = EXPRESSION_TYPES[buffer.readIntLE()];
+                    return new AnimationData(image, textureType, frames, expressionType);
+                }
+
+                @Override
+                public SerializedSkin readSkin(ByteBuf buffer) {
+                    String skinId = this.readString(buffer);
+                    String playFabId = this.readString(buffer);
+                    String skinResourcePatch = this.readString(buffer);
+                    ImageData skinData = helperV388.readImage(buffer, CUSTOM_MODEL_SIZE);
+
+                    List<AnimationData> animations = new ObjectArrayList<>();
+                    this.readArray(buffer, animations, ByteBuf::readIntLE, (b, h) -> this.readAnimationData(b));
+
+                    ImageData capeData = helperV388.readImage(buffer, CUSTOM_MODEL_SIZE);
+                    String geometryData = this.readStringMaxLen(buffer, 1024 * 256); // Allow larger geometry data
+                    String geometryDataEngineVersion = this.readString(buffer);
+                    String animationData = this.readString(buffer);
+                    String capeId = this.readString(buffer);
+                    String fullSkinId = this.readString(buffer);
+                    String armSize = this.readString(buffer);
+                    String skinColor = this.readString(buffer);
+
+                    List<PersonaPieceData> personaPieces = new ObjectArrayList<>();
+                    this.readArray(buffer, personaPieces, ByteBuf::readIntLE, (buf, h) -> {
+                        String pieceId = this.readString(buf);
+                        String pieceType = this.readString(buf);
+                        String packId = this.readString(buf);
+                        boolean isDefault = buf.readBoolean();
+                        String productId = this.readString(buf);
+                        return new PersonaPieceData(pieceId, pieceType, packId, isDefault, productId);
+                    });
+
+                    List<PersonaPieceTintData> tintColors = new ObjectArrayList<>();
+                    this.readArray(buffer, tintColors, ByteBuf::readIntLE, (buf, h) -> {
+                        String pieceType = this.readString(buf);
+                        List<String> colors = new ObjectArrayList<>();
+                        int colorsLength = buf.readIntLE();
+                        for (int i2 = 0; i2 < colorsLength; i2++) {
+                            colors.add(this.readString(buf));
+                        }
+                        return new PersonaPieceTintData(pieceType, colors);
+                    });
+
+                    boolean premium = buffer.readBoolean();
+                    boolean persona = buffer.readBoolean();
+                    boolean capeOnClassic = buffer.readBoolean();
+                    boolean primaryUser = buffer.readBoolean();
+                    boolean overridingPlayerAppearance = buffer.readBoolean();
+
+                    return SerializedSkin.of(skinId, playFabId, skinResourcePatch, skinData, animations, capeData, geometryData, geometryDataEngineVersion,
+                            animationData, premium, persona, capeOnClassic, primaryUser, capeId, fullSkinId, armSize, skinColor, personaPieces, tintColors,
+                            overridingPlayerAppearance);
+                }
+            };
+        });
         return builder.build();
     }
 }
