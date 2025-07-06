@@ -94,7 +94,7 @@ public class ProxiedPlayer implements CommandSender {
     @Getter(AccessLevel.NONE)
     private Map<String, Object> data = new HashMap<String, Object>();
 
-    @Setter
+//    @Setter
     private boolean admin = false;
     /**
      * Signalizes if connection bridges can do entity and block rewrite.
@@ -127,7 +127,7 @@ public class ProxiedPlayer implements CommandSender {
      * Additional downstream and upstream handlers can be set by plugin.
      * Do not set directly BedrockPacketHandler to sessions!
      */
-    @Getter
+//    @Getter
     private final Collection<PluginPacketHandler> pluginPacketHandlers = new ObjectArrayList<>();
 
     public ProxiedPlayer(ProxyServer proxy, BedrockServerSession session, CompressionType compression, LoginData loginData) {

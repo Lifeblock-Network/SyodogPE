@@ -29,6 +29,9 @@ import dev.waterdog.waterdogpe.network.protocol.ProtocolVersion;
 import dev.waterdog.waterdogpe.utils.config.proxy.ProxyConfig;
 import lombok.Getter;
 import org.cloudburstmc.protocol.bedrock.BedrockSession;
+import org.cloudburstmc.protocol.bedrock.data.auth.AuthPayload;
+import org.cloudburstmc.protocol.bedrock.data.auth.CertificateChainPayload;
+import org.cloudburstmc.protocol.bedrock.data.auth.TokenPayload;
 import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
 import org.cloudburstmc.protocol.bedrock.packet.ServerToClientHandshakePacket;
 import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
@@ -81,7 +84,7 @@ public class HandshakeUtils {
         ECPublicKey lastKey = null;
         boolean authed = false;
         Iterator<String> iterator = chainArray.iterator();
-        while(iterator.hasNext()){
+        while (iterator.hasNext()) {
             SignedJWT jwt = SignedJWT.parse(iterator.next());
 
             URI x5u = jwt.getHeader().getX509CertURL();
@@ -93,7 +96,8 @@ public class HandshakeUtils {
             if (lastKey == null) {
                 // First key is self signed
                 lastKey = expectedKey;
-            } else if (strict && !lastKey.equals(expectedKey)) {
+            }
+            else if (strict && !lastKey.equals(expectedKey)) {
                 // Make sure the previous key matches the header of the current
                 throw new IllegalArgumentException("Key does not match");
             }
@@ -107,7 +111,8 @@ public class HandshakeUtils {
 
             if (MOJANG_PUBLIC_KEY.equals(lastKey) || MOJANG_PUBLIC_KEY_OLD.equals(lastKey)) {
                 authed = true;
-            } else if (authed) {
+            }
+            else if (authed) {
                 return !iterator.hasNext();
             }
 
@@ -161,27 +166,34 @@ public class HandshakeUtils {
     }
 
     public static HandshakeEntry processHandshake(BedrockSession session, LoginPacket packet, ProtocolVersion protocol, boolean strict) throws Exception {
-        List<String> chain = packet.getChain();
-        if (chain.isEmpty()) {
-            throw new IllegalArgumentException("Invalid chain data");
-        }
+        AuthPayload authPayload = packet.getAuthPayload();
+        if (authPayload instanceof CertificateChainPayload chainPayload) {
+            List<String> chain = chainPayload.getChain();
+            if (chain.isEmpty()) {
+                throw new IllegalArgumentException("Invalid chain data");
+            }
+            boolean xboxAuth = HandshakeUtils.validateChain(chain, strict);
+            JsonObject payload = (JsonObject) JsonParser.parseString(SignedJWT.parse(chain.get(chain.size() - 1)).getPayload().toString());
+            JsonObject extraData = HandshakeUtils.parseExtraData(packet, payload);
+            if (!payload.has("identityPublicKey")) {
+                throw new RuntimeException("Identity Public Key was not found!");
+            }
+            String identityPublicKeyString = payload.get("identityPublicKey").getAsString();
 
-        boolean xboxAuth = HandshakeUtils.validateChain(chain, strict);
-        JsonObject payload = (JsonObject) JsonParser.parseString(SignedJWT.parse(chain.get(chain.size() - 1)).getPayload().toString());
-        JsonObject extraData = HandshakeUtils.parseExtraData(packet, payload);
-
-        if (!payload.has("identityPublicKey")) {
-            throw new RuntimeException("Identity Public Key was not found!");
+            ECPublicKey identityPublicKey = generateKey(identityPublicKeyString);
+            SignedJWT extraDataJwt = SignedJWT.parse(packet.getClientJwt());
+            if (!verifyJwt(extraDataJwt, identityPublicKey) && strict) {
+                xboxAuth = false;
+            }
+            JsonObject clientData = HandshakeUtils.parseClientData(extraDataJwt, extraData, session);
+            return new HandshakeEntry(identityPublicKey, clientData, extraData, xboxAuth, protocol);
         }
-        String identityPublicKeyString = payload.get("identityPublicKey").getAsString();
-
-        ECPublicKey identityPublicKey = generateKey(identityPublicKeyString);
-        SignedJWT extraDataJwt = SignedJWT.parse(packet.getExtra());
-        if (!verifyJwt(extraDataJwt, identityPublicKey) && strict) {
-            xboxAuth = false;
+        else if (authPayload instanceof TokenPayload) {
+            throw new IllegalArgumentException("Token payload auth is not supported yet");
         }
-        JsonObject clientData = HandshakeUtils.parseClientData(extraDataJwt, extraData, session);
-        return new HandshakeEntry(identityPublicKey, clientData, extraData, xboxAuth, protocol);
+        else {
+            throw new IllegalArgumentException("Invalid auth payload");
+        }
     }
 
     public static JsonObject parseClientData(JWSObject clientJwt, JsonObject extraData, BedrockSession session) {
