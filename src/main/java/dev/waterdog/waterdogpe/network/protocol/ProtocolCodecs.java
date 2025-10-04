@@ -25,8 +25,10 @@ import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
 import org.cloudburstmc.protocol.bedrock.codec.v388.BedrockCodecHelper_v388;
 import org.cloudburstmc.protocol.bedrock.data.EncodingSettings;
+import org.cloudburstmc.protocol.bedrock.data.GameRuleData;
 import org.cloudburstmc.protocol.bedrock.data.skin.*;
 import org.cloudburstmc.protocol.bedrock.packet.*;
+import org.cloudburstmc.protocol.common.util.TextConverter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -185,6 +187,26 @@ public class ProtocolCodecs {
                     float frames = buffer.readFloatLE();
                     AnimationExpressionType expressionType = EXPRESSION_TYPES[buffer.readIntLE()];
                     return new AnimationData(image, textureType, frames, expressionType);
+                }
+
+                @Override
+                public TextConverter getTextConverter() {
+                    return null;
+                }
+
+                @Override
+                public void setTextConverter(TextConverter textConverter) {
+
+                }
+
+                @Override
+                public void writeGameRuleInStartGame(ByteBuf buffer, GameRuleData<?> gameRule) {
+
+                }
+
+                @Override
+                public GameRuleData<?> readGameRuleInStartGame(ByteBuf buffer) {
+                    return null;
                 }
 
                 @Override

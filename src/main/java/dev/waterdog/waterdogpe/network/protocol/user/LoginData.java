@@ -23,6 +23,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.cloudburstmc.protocol.bedrock.data.auth.AuthType;
 import org.cloudburstmc.protocol.bedrock.data.auth.CertificateChainPayload;
+import org.cloudburstmc.protocol.bedrock.data.auth.TokenPayload;
 import org.cloudburstmc.protocol.bedrock.packet.ClientCacheStatusPacket;
 import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
 import org.cloudburstmc.protocol.bedrock.packet.RequestChunkRadiusPacket;
@@ -55,7 +56,6 @@ public class LoginData {
 
     private final KeyPair keyPair;
     private final JsonObject clientData;
-    private final JsonObject extraData;
 
     private LoginPacket loginPacket;
 
@@ -66,6 +66,8 @@ public class LoginData {
     @Setter
     private ClientCacheStatusPacket cachePacket = PlayerRewriteUtils.defaultCachePacket;
 
+    private final boolean isChainPayload;
+
     /**
      * Used to construct new login packet using this.clientData and this.extraData signed by this.keyPair.
      * This method should be called everytime client data is changed. Otherwise player will join to downstream using old data.
@@ -73,14 +75,20 @@ public class LoginData {
      * @return new LoginPacket.
      */
     public LoginPacket rebuildLoginPacket() {
-        SignedJWT signedClientData = HandshakeUtils.createExtraData(this.keyPair, this.extraData);
-        SignedJWT signedExtraData = HandshakeUtils.encodeJWT(this.keyPair, this.clientData);
-
         LoginPacket loginPacket = new LoginPacket();
-        loginPacket.setAuthPayload(new CertificateChainPayload(Collections.singletonList(signedClientData.serialize()), AuthType.SELF_SIGNED));
-        loginPacket.setClientJwt(signedExtraData.serialize());
+        SignedJWT signedClientData = HandshakeUtils.encodeJWT(this.keyPair, this.clientData);
+        loginPacket.setClientJwt(signedClientData.serialize());
         loginPacket.setProtocolVersion(this.protocol.getProtocol());
-        return this.loginPacket = loginPacket;
+        if (isChainPayload) {
+            JsonObject extraData = HandshakeUtils.createChainExtraData(displayName, xuid, uuid);
+            SignedJWT signedPayload = HandshakeUtils.createClientDataChain(this.keyPair, extraData);
+            loginPacket.setAuthPayload(new CertificateChainPayload(Collections.singletonList(signedPayload.serialize()), AuthType.SELF_SIGNED));
+        } else {
+            SignedJWT signedPayload = HandshakeUtils.createClientDataToken(this.keyPair, displayName, xuid);
+            loginPacket.setAuthPayload(new TokenPayload(signedPayload.serialize(), AuthType.SELF_SIGNED));
+        }
+        this.loginPacket = loginPacket;
+        return loginPacket;
     }
 
     public LoginPacket getLoginPacket() {

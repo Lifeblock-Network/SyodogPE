@@ -15,38 +15,37 @@
 
 package dev.waterdog.waterdogpe.player;
 
-import dev.waterdog.waterdogpe.network.connection.codec.compression.CompressionType;
-import dev.waterdog.waterdogpe.network.connection.handler.ReconnectReason;
-import dev.waterdog.waterdogpe.network.connection.peer.BedrockServerSession;
-import dev.waterdog.waterdogpe.network.connection.client.ClientConnection;
-import dev.waterdog.waterdogpe.network.protocol.handler.PluginPacketHandler;
-import dev.waterdog.waterdogpe.network.protocol.handler.downstream.CompressionInitHandler;
-import dev.waterdog.waterdogpe.network.protocol.user.LoginData;
-import dev.waterdog.waterdogpe.network.protocol.user.Platform;
-import dev.waterdog.waterdogpe.network.protocol.handler.downstream.InitialHandler;
-import dev.waterdog.waterdogpe.network.protocol.handler.downstream.SwitchDownstreamHandler;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
-import org.cloudburstmc.protocol.bedrock.data.ScoreInfo;
-import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginData;
-import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginType;
-import org.cloudburstmc.protocol.bedrock.packet.*;
 import dev.waterdog.waterdogpe.ProxyServer;
 import dev.waterdog.waterdogpe.command.CommandSender;
 import dev.waterdog.waterdogpe.event.defaults.*;
 import dev.waterdog.waterdogpe.logger.MainLogger;
-import dev.waterdog.waterdogpe.network.serverinfo.ServerInfo;
+import dev.waterdog.waterdogpe.network.connection.client.ClientConnection;
+import dev.waterdog.waterdogpe.network.connection.codec.compression.CompressionType;
+import dev.waterdog.waterdogpe.network.connection.handler.ReconnectReason;
+import dev.waterdog.waterdogpe.network.connection.peer.BedrockServerSession;
 import dev.waterdog.waterdogpe.network.protocol.ProtocolVersion;
+import dev.waterdog.waterdogpe.network.protocol.handler.PluginPacketHandler;
+import dev.waterdog.waterdogpe.network.protocol.handler.downstream.CompressionInitHandler;
+import dev.waterdog.waterdogpe.network.protocol.handler.downstream.InitialHandler;
+import dev.waterdog.waterdogpe.network.protocol.handler.downstream.SwitchDownstreamHandler;
+import dev.waterdog.waterdogpe.network.protocol.handler.upstream.ConnectedUpstreamHandler;
+import dev.waterdog.waterdogpe.network.protocol.handler.upstream.ResourcePacksHandler;
 import dev.waterdog.waterdogpe.network.protocol.rewrite.RewriteMaps;
 import dev.waterdog.waterdogpe.network.protocol.rewrite.types.RewriteData;
-import dev.waterdog.waterdogpe.network.protocol.handler.upstream.ResourcePacksHandler;
-import dev.waterdog.waterdogpe.network.protocol.handler.upstream.ConnectedUpstreamHandler;
+import dev.waterdog.waterdogpe.network.protocol.user.LoginData;
+import dev.waterdog.waterdogpe.network.protocol.user.Platform;
+import dev.waterdog.waterdogpe.network.serverinfo.ServerInfo;
 import dev.waterdog.waterdogpe.utils.types.Permission;
 import dev.waterdog.waterdogpe.utils.types.TextContainer;
 import dev.waterdog.waterdogpe.utils.types.TranslationContainer;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import org.cloudburstmc.protocol.bedrock.data.ScoreInfo;
+import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginData;
+import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginType;
+import org.cloudburstmc.protocol.bedrock.packet.*;
 import org.cloudburstmc.protocol.common.util.Preconditions;
 
 import java.net.InetSocketAddress;
@@ -69,7 +68,7 @@ public class ProxiedPlayer implements CommandSender {
     private final AtomicBoolean disconnected = new AtomicBoolean(false);
     private final AtomicBoolean loginCalled = new AtomicBoolean(false);
     private final AtomicBoolean loginCompleted = new AtomicBoolean(false);
-    private volatile String disconnectReason;
+    private volatile CharSequence disconnectReason;
 
     private final RewriteData rewriteData = new RewriteData();
     private final LoginData loginData;
@@ -94,7 +93,7 @@ public class ProxiedPlayer implements CommandSender {
     @Getter(AccessLevel.NONE)
     private Map<String, Object> data = new HashMap<String, Object>();
 
-//    @Setter
+    //    @Setter
     private boolean admin = false;
     /**
      * Signalizes if connection bridges can do entity and block rewrite.
@@ -171,7 +170,8 @@ public class ProxiedPlayer implements CommandSender {
 
             if (this.proxy.getConfiguration().enableResourcePacks()) {
                 this.sendResourcePacks();
-            } else {
+            }
+            else {
                 this.initialConnect();
             }
         });
@@ -185,7 +185,8 @@ public class ProxiedPlayer implements CommandSender {
             // Connect player to downstream without sending ResourcePacksInfoPacket
             this.acceptResourcePacks = false;
             this.initialConnect();
-        } else {
+        }
+        else {
             this.connection.setPacketHandler(new ResourcePacksHandler(this));
             this.sendPacket(event.getPacket());
         }
@@ -252,7 +253,8 @@ public class ProxiedPlayer implements CommandSender {
             if (connectingServer.getServerInfo() == targetServer) {
                 this.sendMessage(new TranslationContainer("waterdog.downstream.connecting", targetServer.getServerName()));
                 return;
-            } else {
+            }
+            else {
                 connectingServer.disconnect();
                 this.getLogger().debug("Discarding pending connection for " + this.getName() + "! Tried to join " + targetServer.getServerName());
             }
@@ -264,7 +266,8 @@ public class ProxiedPlayer implements CommandSender {
             try {
                 if (future.cause() == null) {
                     this.connect0(targetServer, connection = (ClientConnection) future.get());
-                } else {
+                }
+                else {
                     this.connectFailure(null, targetServer, future.cause());
                 }
             } catch (Throwable e) {
@@ -301,13 +304,15 @@ public class ProxiedPlayer implements CommandSender {
             ((ConnectedUpstreamHandler) this.connection.getPacketHandler()).setTargetConnection(connection);
             this.hasUpstreamBridge = true;
             handler = new InitialHandler(this, connection);
-        } else {
+        }
+        else {
             handler = new SwitchDownstreamHandler(this, connection);
         }
 
         if (this.getProtocol().isAfterOrEqual(ProtocolVersion.MINECRAFT_PE_1_19_30)) {
             connection.setPacketHandler(new CompressionInitHandler(this, connection, handler));
-        } else {
+        }
+        else {
             connection.setPacketHandler(handler);
             connection.sendPacket(this.loginData.getLoginPacket());
         }
@@ -328,7 +333,8 @@ public class ProxiedPlayer implements CommandSender {
         String exceptionMessage = Objects.requireNonNullElse(error.getLocalizedMessage(), error.getClass().getSimpleName());
         if (this.sendToFallback(targetServer, ReconnectReason.EXCEPTION, exceptionMessage)) {
             this.sendMessage(new TranslationContainer("waterdog.connected.fallback", targetServer.getServerName()));
-        } else {
+        }
+        else {
             this.disconnect(new TranslationContainer("waterdog.downstream.transfer.failed", targetServer.getServerName(), exceptionMessage));
         }
     }
@@ -343,7 +349,8 @@ public class ProxiedPlayer implements CommandSender {
     public void disconnect(TextContainer message) {
         if (message instanceof TranslationContainer container) {
             this.disconnect(container.getTranslated());
-        } else {
+        }
+        else {
             this.disconnect(message.getMessage());
         }
     }
@@ -354,7 +361,7 @@ public class ProxiedPlayer implements CommandSender {
      *
      * @param reason The disconnect reason the player will see on his disconnect screen (Supports Color Codes)
      */
-    public void disconnect(String reason) {
+    public void disconnect(CharSequence reason) {
         if (this.loginCalled.get() && !this.loginCompleted.get()) {
             // Wait until PlayerLoginEvent completes
             this.disconnectReason = reason;
@@ -397,7 +404,7 @@ public class ProxiedPlayer implements CommandSender {
      *
      * @param oldServer server from which was player disconnected.
      * @param reason    disconnected reason.
-     * @param message    disconnected message.
+     * @param message   disconnected message.
      * @return if connection to downstream was successful.
      */
     public boolean sendToFallback(ServerInfo oldServer, ReconnectReason reason, String message) {
@@ -439,8 +446,8 @@ public class ProxiedPlayer implements CommandSender {
         if (this.connection != null && this.connection.isConnected()) {
             BedrockPacketSentToClientEvent event = new BedrockPacketSentToClientEvent(this, packet);
             this.proxy.getEventManager().callEvent(event);
-            if(!event.isCancelled())
-            this.connection.sendPacket(packet);
+            if (!event.isCancelled())
+                this.connection.sendPacket(packet);
         }
     }
 
@@ -453,8 +460,8 @@ public class ProxiedPlayer implements CommandSender {
         if (this.connection != null && this.connection.isConnected()) {
             BedrockPacketSentToClientEvent event = new BedrockPacketSentToClientEvent(this, packet);
             this.proxy.getEventManager().callEvent(event);
-            if(!event.isCancelled())
-            this.connection.sendPacketImmediately(packet);
+            if (!event.isCancelled())
+                this.connection.sendPacketImmediately(packet);
         }
     }
 
@@ -467,7 +474,8 @@ public class ProxiedPlayer implements CommandSender {
     public void sendMessage(TextContainer message) {
         if (message instanceof TranslationContainer container) {
             this.sendTranslation(container);
-        } else {
+        }
+        else {
             this.sendMessage(message.getMessage());
         }
     }
@@ -651,7 +659,7 @@ public class ProxiedPlayer implements CommandSender {
     /**
      * Sends a toast notification with a message to the player
      *
-     * @param title the notification title
+     * @param title   the notification title
      * @param content the message content
      */
     public void sendToastMessage(String title, String content) {
@@ -932,9 +940,10 @@ public class ProxiedPlayer implements CommandSender {
     }
 
     public Object getData(String key, Object fallback) {
-        if(this.hasData(key)) {
+        if (this.hasData(key)) {
             return this.data.get(key);
-        } else return fallback;
+        }
+        else return fallback;
     }
 
 
@@ -963,7 +972,11 @@ public class ProxiedPlayer implements CommandSender {
     }
 
     public String getDisconnectReason() {
-        return this.disconnectReason;
+        return this.getDisconnectReason(String.class);
+    }
+
+    public <T extends CharSequence> T getDisconnectReason(Class<T> type) {
+        return type.cast(this.disconnectReason);
     }
 
     @Override

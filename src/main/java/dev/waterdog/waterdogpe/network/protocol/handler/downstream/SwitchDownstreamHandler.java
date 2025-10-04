@@ -58,7 +58,7 @@ public class SwitchDownstreamHandler extends AbstractDownstreamHandler {
         try {
             SignedJWT saltJwt = SignedJWT.parse(packet.getJwt());
             URI x5u = saltJwt.getHeader().getX509CertURL();
-            ECPublicKey serverKey = HandshakeUtils.generateKey(x5u.toASCIIString());
+            ECPublicKey serverKey = EncryptionUtils.parseKey(x5u.toASCIIString());
             SecretKey key = EncryptionUtils.getSecretKey(
                     this.player.getLoginData().getKeyPair().getPrivate(),
                     serverKey,

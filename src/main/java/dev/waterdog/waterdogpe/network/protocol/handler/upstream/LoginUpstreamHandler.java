@@ -21,14 +21,13 @@ import dev.waterdog.waterdogpe.event.defaults.PlayerAuthenticatedEvent;
 import dev.waterdog.waterdogpe.network.connection.codec.compression.CompressionType;
 import dev.waterdog.waterdogpe.network.connection.peer.BedrockServerSession;
 import dev.waterdog.waterdogpe.network.protocol.ProtocolVersion;
-import dev.waterdog.waterdogpe.network.protocol.user.LoginData;
 import dev.waterdog.waterdogpe.network.protocol.user.HandshakeEntry;
 import dev.waterdog.waterdogpe.network.protocol.user.HandshakeUtils;
+import dev.waterdog.waterdogpe.network.protocol.user.LoginData;
 import dev.waterdog.waterdogpe.player.ProxiedPlayer;
 import dev.waterdog.waterdogpe.security.SecurityManager;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.compat.BedrockCompat;
-import org.cloudburstmc.protocol.bedrock.packet.BedrockPacketHandler;
 import org.cloudburstmc.protocol.bedrock.packet.*;
 import org.cloudburstmc.protocol.common.PacketSignal;
 
@@ -137,7 +136,8 @@ public class LoginUpstreamHandler implements BedrockPacketHandler {
             this.proxy.getLogger().warning("[{}] <-> Upstream has not requested network settings (protocol={})", this.session.getSocketAddress(), protocol.getProtocol());
             this.session.disconnect("Wrong login flow");
             return PacketSignal.HANDLED;
-        } else if (this.compression == null) {
+        }
+        else if (this.compression == null) {
             this.compression = CompressionType.ZLIB;
         }
 
@@ -146,6 +146,13 @@ public class LoginUpstreamHandler implements BedrockPacketHandler {
 
         this.session.setLogging(WaterdogPE.version().debug());
         try {
+            this.proxy.getLogger().debug(
+                    "[{}] <-> Received login with authType: {} and payloadType: {}.",
+                    this.session.getSocketAddress(),
+                    packet.getAuthPayload().getClass().getSimpleName(),
+                    packet.getAuthPayload().getAuthType()
+            );
+
             handshakeEntry = HandshakeUtils.processHandshake(this.session, packet, protocol, strictAuth);
             if (!handshakeEntry.isXboxAuthed() && strictAuth) {
                 this.onLoginFailed(handshakeEntry, null, "disconnectionScreen.notAuthenticated");
@@ -155,7 +162,7 @@ public class LoginUpstreamHandler implements BedrockPacketHandler {
 
             // Thank you Mojang: this version includes protocol changes, but protocol version was not increased.
             if (protocol.equals(ProtocolVersion.MINECRAFT_PE_1_19_60) && handshakeEntry.getClientData().has("GameVersion") &&
-                    ProtocolVersion.MINECRAFT_PE_1_19_62.getMinecraftVersion().equals(handshakeEntry.getClientData().get("GameVersion").getAsString())) {;
+                    ProtocolVersion.MINECRAFT_PE_1_19_62.getMinecraftVersion().equals(handshakeEntry.getClientData().get("GameVersion").getAsString())) {
                 handshakeEntry.setProtocol(protocol = ProtocolVersion.MINECRAFT_PE_1_19_62);
                 this.session.getPeer().setProtocol(protocol);
             }
@@ -180,7 +187,8 @@ public class LoginUpstreamHandler implements BedrockPacketHandler {
 
             if (this.proxy.getConfiguration().isUpstreamEncryption()) {
                 HandshakeUtils.processEncryption(session, handshakeEntry.getIdentityPublicKey());
-            } else {
+            }
+            else {
                 this.finishConnection();
             }
         } catch (Exception e) {

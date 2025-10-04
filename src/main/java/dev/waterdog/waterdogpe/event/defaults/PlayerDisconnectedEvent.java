@@ -26,9 +26,9 @@ import lombok.Getter;
 @AsyncEvent
 public class PlayerDisconnectedEvent extends PlayerEvent {
 
-    private final String reason;
+    private final CharSequence reason;
 
-    public PlayerDisconnectedEvent(ProxiedPlayer player, String reason) {
+    public PlayerDisconnectedEvent(ProxiedPlayer player, CharSequence reason) {
         super(player);
 
         this.reason = reason;
