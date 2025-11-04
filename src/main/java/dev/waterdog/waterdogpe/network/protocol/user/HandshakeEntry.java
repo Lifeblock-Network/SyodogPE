@@ -20,7 +20,6 @@ import dev.waterdog.waterdogpe.ProxyServer;
 import dev.waterdog.waterdogpe.event.defaults.PreClientDataSetEvent;
 import dev.waterdog.waterdogpe.network.connection.peer.BedrockServerSession;
 import dev.waterdog.waterdogpe.network.protocol.ProtocolVersion;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
@@ -29,30 +28,39 @@ import java.security.interfaces.ECPublicKey;
 import java.util.UUID;
 
 @Getter
-@AllArgsConstructor
 public class HandshakeEntry {
 
     private final ECPublicKey identityPublicKey;
     private final JsonObject clientData;
     private final String xuid;
     private final UUID uuid;
-    @Getter
     private final String displayName;
     private final boolean xboxAuthed;
     @Setter
     private ProtocolVersion protocol;
     private final boolean isChainPayload;
 
-    public LoginData buildData(BedrockServerSession session, ProxyServer proxy) {
+    public HandshakeEntry(ECPublicKey identityPublicKey, JsonObject clientData, String xuid, UUID uuid, String displayName, boolean xboxAuthed, ProtocolVersion protocol, boolean isChainPayload) {
+        this.identityPublicKey = identityPublicKey;
+        this.clientData = clientData;
+        this.xuid = xuid;
+        this.uuid = uuid;
+        this.displayName = displayName;
+        this.xboxAuthed = xboxAuthed;
+        this.protocol = protocol;
+        this.isChainPayload = isChainPayload;
+    }
+
+    public LoginData buildData(BedrockServerSession session, ProxyServer proxy) throws Exception {
         // This is first event which exposes new player connecting to proxy.
         // The purpose is to change player's client data or set encryption keypair before joining first downstream.
-        PreClientDataSetEvent event = new PreClientDataSetEvent(this.clientData, xuid, uuid, displayName, EncryptionUtils.createKeyPair(), session);
+        PreClientDataSetEvent event = new PreClientDataSetEvent(this.clientData, this.xuid, this.uuid, this.displayName, EncryptionUtils.createKeyPair(), session);
         proxy.getEventManager().callEvent(event);
 
         LoginData.LoginDataBuilder builder = LoginData.builder();
-        builder.displayName(displayName);
-        builder.uuid(uuid);
-        builder.xuid(xuid);
+        builder.displayName(this.displayName);
+        builder.uuid(this.uuid);
+        builder.xuid(this.xuid);
         builder.xboxAuthed(this.xboxAuthed);
         builder.protocol(this.protocol);
         builder.joinHostname(this.clientData.get("ServerAddress").getAsString().split(":")[0]);

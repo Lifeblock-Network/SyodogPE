@@ -130,6 +130,12 @@ public class ProtocolCodecs {
         HANDLED_PACKETS.add(BlockEntityDataPacket.class);
         HANDLED_PACKETS.add(InventoryTransactionPacket.class);
         HANDLED_PACKETS.add(ClientboundCloseFormPacket.class);
+        HANDLED_PACKETS.add(UpdateEquipPacket.class);
+        HANDLED_PACKETS.add(CameraInstructionPacket.class);
+        HANDLED_PACKETS.add(MovementPredictionSyncPacket.class);
+        HANDLED_PACKETS.add(PlayerUpdateEntityOverridesPacket.class);
+        HANDLED_PACKETS.add(PlayerLocationPacket.class);
+        HANDLED_PACKETS.add(CameraPresetsPacket.class);
     }
 
     private static final List<ProtocolCodecUpdater> UPDATERS = new ObjectArrayList<>();

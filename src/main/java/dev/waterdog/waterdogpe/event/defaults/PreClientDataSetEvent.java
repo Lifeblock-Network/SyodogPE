@@ -18,11 +18,9 @@ package dev.waterdog.waterdogpe.event.defaults;
 import com.google.gson.JsonObject;
 import dev.waterdog.waterdogpe.event.Event;
 import dev.waterdog.waterdogpe.network.connection.ProxiedConnection;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.rmi.server.UID;
 import java.security.KeyPair;
 import java.util.UUID;
 
@@ -35,8 +33,11 @@ public class PreClientDataSetEvent extends Event {
 
     private final ProxiedConnection connection;
     private final JsonObject clientData;
+    @Getter
     private final String xuid;
+    @Getter
     private final UUID uuid;
+    @Getter
     private final String displayName;
     @Setter
     private KeyPair keyPair;

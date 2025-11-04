@@ -25,12 +25,16 @@ import dev.waterdog.waterdogpe.network.protocol.Signals;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
+import org.cloudburstmc.protocol.bedrock.data.camera.CameraPreset;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandData;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandEnumConstraint;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandEnumData;
+import org.cloudburstmc.protocol.bedrock.data.command.*;
 import org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition;
+import org.cloudburstmc.protocol.bedrock.data.definitions.SimpleNamedDefinition;
 import org.cloudburstmc.protocol.bedrock.netty.BedrockBatchWrapper;
 import org.cloudburstmc.protocol.bedrock.packet.*;
+import org.cloudburstmc.protocol.common.NamedDefinition;
 import org.cloudburstmc.protocol.common.PacketSignal;
 import org.cloudburstmc.protocol.common.SimpleDefinitionRegistry;
 
@@ -87,6 +91,7 @@ public abstract class AbstractDownstreamHandler implements ProxyPacketHandler {
 
         for (Command command : this.player.getProxy().getCommandMap().getCommands().values()) {
             if (command.getPermission() == null || this.player.hasPermission(command.getPermission())) {
+                packet.getCommands().stream().filter(commandData -> commandData.getName().equalsIgnoreCase(command.getName())).findFirst().ifPresent(commandData -> packet.getCommands().remove(commandData));
                 packet.getCommands().add(command.getCommandData());
             }
         }
@@ -114,6 +119,16 @@ public abstract class AbstractDownstreamHandler implements ProxyPacketHandler {
                     Collections.emptyList(),
                     command.getOverloads()));
         }
+
+        for(CommandData command : packet.getCommands()) {
+            for(CommandOverloadData overload : command.getOverloads()) {
+                for(CommandParamData param : overload.getOverloads()) {
+                    if(param.getType() == null) {
+                        param.setType(CommandParam.UNKNOWN);
+                    }
+                }
+            }
+        }
         return PacketSignal.HANDLED;
     }
 
@@ -134,6 +149,12 @@ public abstract class AbstractDownstreamHandler implements ProxyPacketHandler {
         if (this.player.getProtocol().isBefore(ProtocolVersion.MINECRAFT_PE_1_18_30)) {
             this.player.getChunkBlobs().removeAll(packet.getBlobs().keySet());
         }
+        return PacketSignal.UNHANDLED;
+    }
+
+    @Override
+    public PacketSignal handle(CameraPresetsPacket packet) {
+        setCameraPresetDefinitions(packet.getPresets());
         return PacketSignal.UNHANDLED;
     }
 
@@ -181,5 +202,17 @@ public abstract class AbstractDownstreamHandler implements ProxyPacketHandler {
             }
         }
         codecHelper.setItemDefinitions(itemRegistry.build());
+    }
+
+    protected void setCameraPresetDefinitions(Collection<CameraPreset> presets) {
+        BedrockCodecHelper codecHelper = this.player.getConnection()
+                .getPeer()
+                .getCodecHelper();
+        SimpleDefinitionRegistry.Builder<NamedDefinition> registry = SimpleDefinitionRegistry.builder();
+        int id = 0;
+        for (CameraPreset preset : presets) {
+            registry.add(new SimpleNamedDefinition(preset.getIdentifier(), id++));
+        }
+        codecHelper.setCameraPresetDefinitions(registry.build());
     }
 }

@@ -30,7 +30,16 @@ public class PlayerDisconnectedEvent extends PlayerEvent {
 
     public PlayerDisconnectedEvent(ProxiedPlayer player, CharSequence reason) {
         super(player);
-
         this.reason = reason;
     }
+
+
+    public String getReason() {
+        return this.getReason(String.class);
+    }
+
+    public <T extends CharSequence> T getReason(Class<T> type) {
+        return type.cast(this.reason);
+    }
+
 }

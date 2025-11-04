@@ -17,10 +17,12 @@ package dev.waterdog.waterdogpe.network.protocol.user;
 
 import com.google.gson.JsonObject;
 import com.nimbusds.jwt.SignedJWT;
+import dev.waterdog.waterdogpe.ProxyServer;
 import dev.waterdog.waterdogpe.network.protocol.ProtocolVersion;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.cloudburstmc.protocol.bedrock.data.auth.AuthType;
 import org.cloudburstmc.protocol.bedrock.data.auth.CertificateChainPayload;
 import org.cloudburstmc.protocol.bedrock.data.auth.TokenPayload;
@@ -36,9 +38,11 @@ import java.util.UUID;
 /**
  * Holds relevant information passed to the proxy on the first connection (initial) in the LoginPacket.
  */
-@Getter
+@Slf4j
 @Builder
+@Getter
 public class LoginData {
+
     private final String displayName;
     private final UUID uuid;
     private final String xuid;
@@ -56,14 +60,13 @@ public class LoginData {
 
     private final KeyPair keyPair;
     private final JsonObject clientData;
-
     private LoginPacket loginPacket;
 
-    @Builder.Default
     @Setter
+    @Builder.Default
     private RequestChunkRadiusPacket chunkRadius = PlayerRewriteUtils.defaultChunkRadius;
-    @Builder.Default
     @Setter
+    @Builder.Default
     private ClientCacheStatusPacket cachePacket = PlayerRewriteUtils.defaultCachePacket;
 
     private final boolean isChainPayload;
@@ -79,7 +82,7 @@ public class LoginData {
         SignedJWT signedClientData = HandshakeUtils.encodeJWT(this.keyPair, this.clientData);
         loginPacket.setClientJwt(signedClientData.serialize());
         loginPacket.setProtocolVersion(this.protocol.getProtocol());
-        if (isChainPayload) {
+        if (isChainPayload || ProxyServer.getInstance().getConfiguration().useCertificatePayload()) {
             JsonObject extraData = HandshakeUtils.createChainExtraData(displayName, xuid, uuid);
             SignedJWT signedPayload = HandshakeUtils.createClientDataChain(this.keyPair, extraData);
             loginPacket.setAuthPayload(new CertificateChainPayload(Collections.singletonList(signedPayload.serialize()), AuthType.SELF_SIGNED));
@@ -97,4 +100,5 @@ public class LoginData {
         }
         return this.loginPacket;
     }
+
 }

@@ -18,7 +18,6 @@ package dev.waterdog.waterdogpe.network.protocol.handler.downstream;
 import com.nimbusds.jwt.SignedJWT;
 import dev.waterdog.waterdogpe.network.connection.client.ClientConnection;
 import dev.waterdog.waterdogpe.network.protocol.handler.TransferCallback;
-import dev.waterdog.waterdogpe.network.protocol.user.HandshakeUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.math.vector.Vector3f;
