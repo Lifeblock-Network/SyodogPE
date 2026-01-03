@@ -16,6 +16,7 @@
 package dev.waterdog.waterdogpe.network.protocol.handler;
 
 import dev.waterdog.waterdogpe.network.connection.ProxiedConnection;
+import dev.waterdog.waterdogpe.network.protocol.CustomPlayerListSerializer;
 import dev.waterdog.waterdogpe.network.protocol.Signals;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCountUtil;
@@ -24,19 +25,27 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.protocol.bedrock.PacketDirection;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
+import org.cloudburstmc.protocol.bedrock.data.skin.ImageData;
+import org.cloudburstmc.protocol.bedrock.data.skin.SerializedSkin;
 import org.cloudburstmc.protocol.bedrock.netty.BedrockBatchWrapper;
 import org.cloudburstmc.protocol.bedrock.netty.BedrockPacketWrapper;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacketHandler;
 import org.cloudburstmc.protocol.bedrock.packet.DisconnectPacket;
+import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
 import org.cloudburstmc.protocol.common.PacketSignal;
 import org.cloudburstmc.protocol.common.util.Preconditions;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Base64;
 import java.util.ListIterator;
 
 @Data
 @Log4j2
 public class ProxyBatchBridge implements BedrockPacketHandler {
+
     private final BedrockCodec codec;
     private final BedrockCodecHelper helper;
 
@@ -44,6 +53,9 @@ public class ProxyBatchBridge implements BedrockPacketHandler {
     private boolean forceEncode;
 
     public ProxyBatchBridge(BedrockCodec codec, BedrockCodecHelper helper, ProxyPacketHandler handler) {
+        codec = codec.toBuilder()
+                .updateSerializer(PlayerListPacket.class, CustomPlayerListSerializer.INSTANCE)
+                .build();
         this.codec = codec;
         this.helper = helper;
         this.setHandler(handler);
@@ -66,7 +78,8 @@ public class ProxyBatchBridge implements BedrockPacketHandler {
                 ReferenceCountUtil.release(wrapper.getPacketBuffer());
                 wrapper.setPacketBuffer(null); // clear cached buffer
                 batch.modify();
-            } else if (signal == Signals.CANCEL) {
+            }
+            else if (signal == Signals.CANCEL) {
                 iterator.remove(); // remove from batch
                 wrapper.release(); // release
                 batch.modify();
@@ -80,6 +93,9 @@ public class ProxyBatchBridge implements BedrockPacketHandler {
 
     @Override
     public PacketSignal handlePacket(BedrockPacket packet) {
+        if (packet == null) {
+            throw new NullPointerException("Cannot handle packet that is null");
+        }
         try {
             PacketSignal signal = this.handler.handlePacket(packet);
             PacketSignal rewriteSignal = this.handler.doPacketRewrite(packet);

@@ -45,7 +45,7 @@ public class RakNetPingHandler extends SimpleChannelInboundHandler<RakPing> {
 
         ProxyPingEvent event = new ProxyPingEvent(
                 config.getMotd(),
-                "§9discord.syodo.xyz",
+                "§9discord.gg/lifeblock",
                 "Survival",
                 "MCPE",
                 ProtocolVersion.latest().getMinecraftVersion(),
